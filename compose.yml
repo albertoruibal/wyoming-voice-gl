@@ -5,13 +5,9 @@
 #
 # Data dirs are RELATIVE to this compose file (./phoonnx-data etc.), so run
 # compose FROM THIS FOLDER:  cd wyoming-voice-gl && docker compose up -d --build
-# Trap from experience: compose launched from ANOTHER working directory (e.g.
-# another container with the docker socket) resolves ./ against ITS cwd — the
-# daemon then bind-mounts the WRONG path and silently bind-creates EMPTY dirs
-# (VoiceNotFoundError crash loops). If the repo is reached through a symlink,
-# container-resolved relative paths still land correctly; from any OTHER cwd
-# set DATA_ROOT to this repo's absolute path:
-#   DATA_ROOT=/path/to/wyoming-voice-gl docker compose up -d
+# From another cwd, pass the compose file explicitly; relative paths resolve
+# against its directory:
+#   docker compose -f /path/to/wyoming-voice-gl/compose.yml up -d --build
 name: wyoming-voice-gl
 
 services:
@@ -33,12 +29,11 @@ services:
     build: ./tts/phoonnx-wyoming
     image: phoonnx-wyoming:latest
     restart: unless-stopped
-    # NOTE: a bind-mounted FILE over an inner path the daemon never saw gets
-    # materialized as an empty DIR on first start — keep mycroft.conf inside the
-    # daemon-known data dir and mount the file from there.
+    # Keep the tracked config in the repo and mount it read-only; the runtime
+    # cache stays in phoonnx-data.
     volumes:
       - ./phoonnx-data:/home/ovos/.cache
-      - ./phoonnx-data/mycroft.conf:/home/ovos/.config/mycroft/mycroft.conf:ro
+      - ./tts/phoonnx-wyoming/mycroft.conf:/home/ovos/.config/mycroft/mycroft.conf:ro
     environment:
       - TZ=Europe/Madrid
       - PHOONNX_DEFAULT_VOICE_GL=proxectonos/celtia

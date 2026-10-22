@@ -21,8 +21,9 @@ serves piper-voices ports (e.g. piper/es_ES-davefx-medium) if you need more
 - docker + compose (any machine with /dev/dri GPU for whisper STT; the STT
   also runs CPU-only in the fallback documented in the blog).
 - For whisper: Vulkan drivers on the host (`mesa-vulkan-drivers`), GPU access.
-- Writable data dirs relative to the compose file: `phoonnx-data/` (phoonnx voice
-  cache + mycroft.conf) and `whisper-data/` (whisper model cache if not baked in).
+- Writable data dir relative to the compose file: `phoonnx-data/` (phoonnx voice
+  and synthesis cache). `whisper-data/` is only used by the commented-out CPU
+  fallback.
 
 ## Voices (not in git)
 
@@ -40,12 +41,11 @@ The piper-voice ports (piper/<lang>-<name>-<quality>) are in the same index.
     cd wyoming-voice-gl && docker compose up -d --build
 
     # launching from a different cwd (e.g. a container driving the docker socket):
-    DATA_ROOT=/path/to/wyoming-voice-gl docker compose up -d --build
+    docker compose -f /path/to/wyoming-voice-gl/compose.yml up -d --build
 
-Volumes are **relative to the compose file** (`./phoonnx-data`): running compose
-from another working directory resolves `./` against THAT cwd and the daemon
-silently bind-creates empty dirs (crash loop). If the repo path is a symlink,
-both invocations work; otherwise use the `DATA_ROOT=...` variant above.
+Volumes are **relative to the compose file** (`./phoonnx-data`). Passing `-f`
+explicitly resolves them against the compose file's directory, so the data dirs
+land in the repo regardless of the caller's cwd.
 
 ## Wire into Home Assistant
 
@@ -73,9 +73,9 @@ agent. Select the pipeline on the assist_satellite device.
 }
 ```
 
-It lives at `./phoonnx-data/mycroft.conf`, bind-mounted read-only.
+It lives at `tts/phoonnx-wyoming/mycroft.conf` and is bind-mounted read-only.
 The bridge only reads plugin config from mycroft.conf (its env fallback does
-not fill the advertised-language list), so edit it there and
+not fill the advertised-language list), so edit the tracked file and
 `docker compose restart phoonnx`.
 
 ## Tests
