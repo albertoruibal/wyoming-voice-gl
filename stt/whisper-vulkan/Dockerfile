@@ -51,7 +51,7 @@ RUN chmod 0755 /opt/wyoming-whisper-vulkan-service/run.sh
 WORKDIR /opt/wyoming-whisper-vulkan-service
 
 ENV HOME=/home/whisper
-USER whisper
+USER 1000:1000
 
 EXPOSE 10300
 ENTRYPOINT ["/opt/wyoming-whisper-vulkan-service/run.sh"]

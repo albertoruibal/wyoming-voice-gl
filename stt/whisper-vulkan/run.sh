@@ -5,6 +5,7 @@ set -u
 lang=gl
 model=large-v3-turbo
 
+# shellcheck disable=SC2329  # invoked by the traps below
 cleanup() {
   kill "${whisper_pid:-}" "${wyoming_pid:-}" 2>/dev/null || true
   wait 2>/dev/null || true

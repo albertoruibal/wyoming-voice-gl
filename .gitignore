@@ -9,3 +9,8 @@ whisper-data/
 __pycache__/
 .venv/
 /.idea/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log

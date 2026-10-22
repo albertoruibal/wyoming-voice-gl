@@ -1,0 +1,3 @@
+# Fedora package versions churn; the base image digest is pinned instead.
+ignored:
+  - DL3041
