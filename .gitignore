@@ -1,0 +1,11 @@
+*.wav
+*.mp3
+*.onnx
+*.onnx.json
+*.bin
+*.ppn
+phoonnx-data/
+whisper-data/
+__pycache__/
+.venv/
+/.idea/

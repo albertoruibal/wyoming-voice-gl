@@ -1,0 +1,60 @@
+# Galician voice pipelines for Home Assistant (wyoming protocol).
+#   stt  = whisper.cpp (large-v3-turbo, Vulkan on AMD 780M) -> wyoming :10300
+#   tts  = phoonnx + wyoming-ovos-tts bridge                 -> wyoming :10400 (debug HTTP :9666)
+#          (voices incl. piper-voices ports like piper/es_ES-davefx-medium if added)
+#
+# Data dirs are RELATIVE to this compose file (./phoonnx-data etc.), so run
+# compose FROM THIS FOLDER:  cd wyoming-voice-gl && docker compose up -d --build
+# Trap from experience: compose launched from ANOTHER working directory (e.g.
+# another container with the docker socket) resolves ./ against ITS cwd — the
+# daemon then bind-mounts the WRONG path and silently bind-creates EMPTY dirs
+# (VoiceNotFoundError crash loops). If the repo is reached through a symlink,
+# container-resolved relative paths still land correctly; from any OTHER cwd
+# set DATA_ROOT to this repo's absolute path:
+#   DATA_ROOT=/path/to/wyoming-voice-gl docker compose up -d
+name: wyoming-voice-gl
+
+services:
+  whisper:
+    build: ./stt/whisper-vulkan
+    image: wyoming-whisper-vulkan
+    restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "10300:10300"
+    command: -l gl
+
+  phoonnx:
+    build: ./tts/phoonnx-wyoming
+    image: phoonnx-wyoming:latest
+    restart: unless-stopped
+    # NOTE: a bind-mounted FILE over an inner path the daemon never saw gets
+    # materialized as an empty DIR on first start — keep mycroft.conf inside the
+    # daemon-known data dir and mount the file from there.
+    volumes:
+      - ./phoonnx-data:/home/ovos/.cache
+      - ./phoonnx-data/mycroft.conf:/home/ovos/.config/mycroft/mycroft.conf:ro
+    environment:
+      - TZ=Europe/Madrid
+      - PHOONNX_DEFAULT_VOICE_GL=proxectonos/celtia
+    entrypoint: ["wyoming-ovos-tts"]
+    command: ["--uri", "tcp://0.0.0.0:10400", "--plugin-name", "ovos-tts-plugin-phoonnx"]
+    ports:
+      - "10400:10400"
+      - "9666:9666"
+
+#  # CPU fallback (faster-whisper, galician finetune ~2.3s/request):
+#  whisper:
+#    image: rhasspy/wyoming-whisper
+#    volumes:
+#      - ./whisper-data:/data
+#    environment:
+#      - TZ=Europe/Madrid
+#    command: --model Jarbas/faster-whisper-small-gl-cv13 --language gl --beam-size 1 --cpu-threads 8 --compute-type int8
+#    ports:
+#      - "10300:10300"
