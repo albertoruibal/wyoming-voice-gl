@@ -32,7 +32,9 @@ FROM registry.fedoraproject.org/fedora-minimal@sha256:1dc6bd367b14f10b205a0b49af
 
 RUN microdnf -y --nodocs --setopt=install_weak_deps=0 install \
         bash ncurses ca-certificates libstdc++ libgcc libatomic libgomp \
-        vulkan-loader vulkaninfo mesa-vulkan-drivers python3 \
+        vulkan-loader vulkaninfo mesa-vulkan-drivers python3 shadow-utils \
+    && groupadd --gid 1000 whisper \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /sbin/nologin whisper \
     && microdnf clean all && rm -rf /var/cache/dnf/*
 
 ARG WHISPER_MODEL
@@ -47,6 +49,9 @@ COPY --from=builder /tmp/libs/ /usr/lib64/
 COPY run.sh /opt/wyoming-whisper-vulkan-service/run.sh
 RUN chmod 0755 /opt/wyoming-whisper-vulkan-service/run.sh
 WORKDIR /opt/wyoming-whisper-vulkan-service
+
+ENV HOME=/home/whisper
+USER whisper
 
 EXPOSE 10300
 ENTRYPOINT ["/opt/wyoming-whisper-vulkan-service/run.sh"]

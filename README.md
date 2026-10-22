@@ -10,7 +10,7 @@ speech-to-text (STT) and text-to-speech (TTS), no cloud, docker-compose only.
 | Service | Port | Proto | Voices / model |
 |---|---|---|---|
 | `whisper` (STT) | 10300 | wyoming | whisper.cpp large-v3-turbo, Vulkan (AMD 780M), lang `gl` |
-| `phoonnx` (TTS) | 10400 (wyoming), 9666 (HTTP) | wyoming | **`proxectonos/celtia`** (Proxecto Nós), `brais`, plus aHoTTS voices |
+| `phoonnx` (TTS) | 10400 (wyoming), 9666 (HTTP, localhost) | wyoming | **`proxectonos/celtia`** (Proxecto Nós), `brais`, plus aHoTTS voices |
 
 phoonnx (TigreGótico/OpenVoiceOS, ILENIA-funded) carries the Proxecto Nós
 Galician voices (celtia, brais) and is the only TTS here; its plugin also
