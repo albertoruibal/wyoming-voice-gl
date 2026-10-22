@@ -14,11 +14,11 @@ import argparse
 _p = argparse.ArgumentParser()
 _p.add_argument("--host", default=os.environ.get("WYOMING_HOST", "localhost"))
 _p.add_argument("--port", type=int, default=10400)
-_p.add_argument("--text", default="Ola, son a voz de Piper en galego. Proba de s\u00edntese.")
+_p.add_argument("--text", default="Ola, son a voz de celtia en galego. Proba de s\u00edntese.")
 _p.add_argument("--lang", default="gl-ES")
-_p.add_argument("--out", default="/tmp/piper_gl_test.wav")
+_p.add_argument("--voice", default=None, help="voice name from tts info (overrides --lang)")
+_p.add_argument("--out", default="/tmp/phoonnx_gl_test.wav")
 ARGS = _p.parse_args()
-HOST, PORT, TEXT = ARGS.host, ARGS.port, ARGS.text
 
 
 async def main() -> int:
@@ -48,7 +48,10 @@ async def main() -> int:
             print("all langs:", sorted(langs))
 
         await client.write_event(
-            Synthesize(text=TEXT, voice=SynthesizeVoice(language=ARGS.lang)).event()
+            Synthesize(
+                text=ARGS.text,
+                voice=SynthesizeVoice(name=ARGS.voice, language=ARGS.lang),
+            ).event()
         )
         rate = width = channels = None
         pcm = bytearray()
@@ -64,6 +67,12 @@ async def main() -> int:
                 pcm += AudioChunk.from_event(event).audio
             elif AudioStop.is_type(event.type):
                 break
+        if rate is None or width is None or channels is None:
+            print("FAIL: no AudioStart event")
+            return 1
+        if not pcm:
+            print("FAIL: no audio data")
+            return 1
         out = ARGS.out
         with wave.open(out, "wb") as w:
             w.setnchannels(channels)
