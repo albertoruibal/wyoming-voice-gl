@@ -12,7 +12,10 @@ name: wyoming-voice-gl
 
 services:
   whisper:
-    build: ./stt/whisper-vulkan
+    build:
+      context: ./stt/whisper-vulkan
+      args:
+        WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo}
     image: wyoming-whisper-vulkan
     restart: unless-stopped
     devices:
@@ -23,7 +26,9 @@ services:
       - seccomp:unconfined
     ports:
       - "10300:10300"
-    command: -l gl
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+    command: ["-l", "${WHISPER_LANG:-gl}"]
 
   phoonnx:
     build: ./tts/phoonnx-wyoming
@@ -35,7 +40,7 @@ services:
       - ./phoonnx-data:/home/ovos/.cache
       - ./tts/phoonnx-wyoming/mycroft.conf:/home/ovos/.config/mycroft/mycroft.conf:ro
     environment:
-      - TZ=Europe/Madrid
+      - TZ=${TZ:-Europe/Madrid}
       - PHOONNX_DEFAULT_VOICE_GL=proxectonos/celtia
     entrypoint: ["wyoming-ovos-tts"]
     command: ["--uri", "tcp://0.0.0.0:10400", "--plugin-name", "ovos-tts-plugin-phoonnx"]

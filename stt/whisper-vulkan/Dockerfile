@@ -1,6 +1,6 @@
 ARG WHISPER_MODEL=large-v3-turbo
 
-FROM registry.fedoraproject.org/fedora:latest AS builder
+FROM registry.fedoraproject.org/fedora@sha256:4a78eff1423dcce55cf68b8fd66e7cdca61c85978283db3ecc3089a8419fbbc0 AS builder
 
 RUN dnf -y --nodocs install \
         git python3-pip bash cmake g++ \
@@ -8,7 +8,8 @@ RUN dnf -y --nodocs install \
     && dnf clean all && rm -rf /var/cache/dnf/*
 
 WORKDIR /opt/whisper.cpp
-RUN git clone https://github.com/ggml-org/whisper.cpp.git .
+RUN git clone https://github.com/ggml-org/whisper.cpp.git . \
+    && git checkout 231638a0717b7822784297e5980965ffcec05810
 
 RUN git clean -xdf \
     && cmake -B build -DGGML_VULKAN=1 \
@@ -23,10 +24,11 @@ RUN find /opt/whisper.cpp/build \( -name "libwhisper*" -o -name "libggml*" \) -e
 
 WORKDIR /opt/wyoming-whisper-api-client
 RUN git clone https://github.com/ser/wyoming-whisper-api-client.git . \
+    && git checkout 4a5de75634d42cda75a67303f85ad99c9489995d \
     && script/setup \
     && .venv/bin/pip install --no-deps .
 
-FROM registry.fedoraproject.org/fedora-minimal:latest AS runtime
+FROM registry.fedoraproject.org/fedora-minimal@sha256:1dc6bd367b14f10b205a0b49afcef8e295952a4187190f1672c3074f8117b74d AS runtime
 
 RUN microdnf -y --nodocs --setopt=install_weak_deps=0 install \
         bash ncurses ca-certificates libstdc++ libgcc libatomic libgomp \
