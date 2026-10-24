@@ -35,29 +35,33 @@ On the docker daemon host, from the repo folder:
 cd wyoming-voice-gl && ./setup.sh
 ```
 
-`./setup.sh` downloads the voice you pick and the whisper model if missing, updates `mycroft.conf`, then starts the
-services (building only missing images) and restarts whisper and phoonnx. Config and model changes never rebuild the
-images. Volumes are **relative to the compose file** (`./phoonnx-data`, `./whisper-data`). Passing `-f` explicitly
+`./setup.sh` asks which whisper model and voice to use, downloads anything missing, updates `mycroft.conf`, then starts
+the services (building only missing images) and restarts whisper and phoonnx. Config and model changes never rebuild
+the images. Volumes are **relative to the compose file** (`./phoonnx-data`, `./whisper-data`). Passing `-f` explicitly
 resolves them against the compose file's directory, so the data dirs land in the repo regardless of the caller's cwd.
 The first build pulls the large phoonnx image, and the first setup downloads the whisper model, so expect it to take a
 while. After changing a Dockerfile, run `docker compose build` explicitly.
 
 ## Configuration
 
-| Variable        | Default          | Purpose                                                           |
-|-----------------|------------------|-------------------------------------------------------------------|
-| `WHISPER_MODEL` | `large-v3-turbo` | whisper.cpp model fetched by `setup.sh` and passed to the server     |
-| `WHISPER_LANG`  | `gl`             | language passed to whisper                                        |
-| `TZ`            | `Europe/Madrid`  | timezone in both containers                                       |
-| `VOICE`         | (menu)           | skip the prompt, download this voice and set it in `mycroft.conf` |
-| `EXTRA_VOICES`  | none             | extra voices to prefetch without changing the active voice        |
+| Variable        | Default          | Purpose                                                              |
+|-----------------|------------------|----------------------------------------------------------------------|
+| `WHISPER_MODEL` | `large-v3-turbo` | whisper.cpp model; chosen from the setup menu, or set it to skip      |
+| `WHISPER_LANG`  | `gl`             | language passed to whisper                                           |
+| `TZ`            | `Europe/Madrid`  | timezone in both containers                                          |
+| `VOICE`         | (menu)           | skip the prompt, download this voice and set it in `mycroft.conf`    |
+| `EXTRA_VOICES`  | none             | extra voices to prefetch without changing the active voice           |
+
+The setup menu lists the multilingual whisper.cpp models (default `large-v3-turbo`; English-only `.en` variants can be
+passed directly via `WHISPER_MODEL`). Set `WHISPER_MODEL` or `VOICE`, or pass a voice argument, to skip that prompt;
+non-interactive runs use the defaults.
 
 Change the whisper model with `WHISPER_MODEL=large-v3 ./setup.sh`: it downloads the model into `whisper-data/` and
 restarts whisper. No image rebuild is needed. Override the download mirror with `WHISPER_MODEL_BASE_URL`.
 
 ### Models on disk
 
-`./setup.sh` fetches both model sets and skips anything already cached:
+`./setup.sh` fetches both model sets and skips anything already cached; the whisper menu marks cached models:
 
 - `whisper-data/ggml-<model>.bin` — bind-mounted at `/models`; not baked into the image.
 - `phoonnx-data/` — phoonnx/Hugging Face voice cache.

@@ -4,7 +4,7 @@
 #
 # What gets downloaded (and where it lands):
 #   <voice>  (~150 MB onnx)     -> phoonnx-data  (phoonnx HF cache)
-#   ggml-<model>.bin (~1.6 GB)  -> whisper-data  (bind-mounted at /models)
+#   ggml-<model>.bin (32 MB-3 GB) -> whisper-data  (bind-mounted at /models)
 #   phoonnx also keeps a synthesis cache under phoonnx-data/mycroft/
 #
 # Which voice gets used is stored in tts/phoonnx-wyoming/mycroft.conf (the
@@ -12,16 +12,16 @@
 # its "voice" field, so the selection survives restarts.
 #
 # Usage:
-#   ./setup.sh                     # menu: pick, download, set voice
-#   ./setup.sh proxectonos/brais   # same without the menu
+#   ./setup.sh                     # menus: pick whisper model and voice
+#   ./setup.sh proxectonos/brais   # pick the whisper model only
 #   VOICE=proxectonos/brais ./setup.sh
 #   EXTRA_VOICES="hitz/gl_sabela-vits omnivoice/gl" ./setup.sh
-#   WHISPER_MODEL=large-v3 ./setup.sh   # also fetch another whisper model
+#   WHISPER_MODEL=large-v3 ./setup.sh   # skip the model prompt
 #
 # The whisper model is cached in whisper-data/ and mounted into the container,
 # so it is not baked into the image and does not require a rebuild.
 #
-# When stdin is not a TTY and no voice is given, the default is proxectonos/celtia.
+# When stdin is not a TTY, the defaults are large-v3-turbo and proxectonos/celtia.
 #
 # If the phoonnx service is running, the script uses docker compose exec.
 # Otherwise it starts a one-off container (building the image if needed).
@@ -55,16 +55,85 @@ require_docker_compose() {
 
 require_docker_compose
 
-WHISPER_MODEL="${WHISPER_MODEL:-large-v3-turbo}"
+WHISPER_MODEL="${WHISPER_MODEL:-}"
+WHISPER_DEFAULT_MODEL=large-v3-turbo
 WHISPER_MODEL_BASE_URL="${WHISPER_MODEL_BASE_URL:-https://huggingface.co/ggerganov/whisper.cpp/resolve/main}"
 WHISPER_DATA="$HERE/whisper-data"
+WHISPER_MODELS=(
+  large-v3-turbo
+  large-v3-turbo-q8_0
+  large-v3-turbo-q5_0
+  large-v3
+  large-v3-q5_0
+  large-v2
+  large-v2-q8_0
+  large-v2-q5_0
+  large-v1
+  medium
+  medium-q8_0
+  medium-q5_0
+  small
+  small-q8_0
+  small-q5_1
+  base
+  base-q8_0
+  base-q5_1
+  tiny
+  tiny-q8_0
+  tiny-q5_1
+)
+
+whisper_model_cached() {
+  [[ -s "$WHISPER_DATA/ggml-$1.bin" ]]
+}
+
+print_whisper_menu() {
+  local i=1 model note
+  echo "Available whisper.cpp models (multilingual; English-only .en variants also exist):"
+  for model in "${WHISPER_MODELS[@]}"; do
+    note=""
+    [[ "$model" == "$WHISPER_DEFAULT_MODEL" ]] && note="default"
+    if whisper_model_cached "$model"; then
+      note="${note:+$note, }cached"
+    fi
+    if [[ -n "$note" ]]; then
+      printf '   %2d) %s (%s)\n' "$i" "$model" "$note"
+    else
+      printf '   %2d) %s\n' "$i" "$model"
+    fi
+    i=$((i + 1))
+  done
+}
+
+choose_whisper_model() {
+  local choice model
+  print_whisper_menu
+  while true; do
+    if ! read -r -p "Whisper model to download [1-${#WHISPER_MODELS[@]}, default 1]: " choice; then
+      echo ">> no input; using ${WHISPER_DEFAULT_MODEL}" >&2
+      choice=1
+    fi
+    choice="${choice:-1}"
+    if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#WHISPER_MODELS[@]})); then
+      WHISPER_MODEL="${WHISPER_MODELS[choice - 1]}"
+      return
+    fi
+    for model in "${WHISPER_MODELS[@]}"; do
+      if [[ "$choice" == "$model" ]]; then
+        WHISPER_MODEL="$model"
+        return
+      fi
+    done
+    echo "!! invalid selection: $choice" >&2
+  done
+}
 
 fetch_whisper_model() {
   local dest="$WHISPER_DATA/ggml-${WHISPER_MODEL}.bin"
   local url="${WHISPER_MODEL_BASE_URL}/ggml-${WHISPER_MODEL}.bin"
   local tmp="${dest}.part"
-  if [[ -s "$dest" ]]; then
-    echo ">> whisper model ${WHISPER_MODEL} is already downloaded; skipping"
+  if whisper_model_cached "$WHISPER_MODEL"; then
+    echo ">> whisper model ${WHISPER_MODEL} is already downloaded; skipping download"
     return 0
   fi
   mkdir -p "$WHISPER_DATA"
@@ -194,6 +263,14 @@ PY
   fi
   echo ">> set voice '$voice' in ${conf#"$HERE"/}"
 }
+
+if [[ -z "$WHISPER_MODEL" ]]; then
+  if [[ -t 0 ]]; then
+    choose_whisper_model
+  else
+    WHISPER_MODEL="$WHISPER_DEFAULT_MODEL"
+  fi
+fi
 
 VOICE="${VOICE:-}"
 if [[ $# -ge 1 ]]; then
