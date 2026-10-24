@@ -25,6 +25,11 @@ services:
       - /dev/dri:/dev/dri
     group_add:
       - video
+      # Host render node /dev/dri/renderD128 is owned by the host's dynamic
+      # "render" group (gid 992 on this Ubuntu host, NOT the image's gid 105).
+      # Without it RADV cannot open the render node and whisper.cpp silently
+      # falls back to CPU (logs: whisper_backend_init_gpu: no GPU found).
+      - "992"
     # Vulkan/Mesa needs the wider syscall set on this host. Drop this if the
     # default seccomp profile works for your GPU/driver.
     security_opt:
