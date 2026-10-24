@@ -1,11 +1,11 @@
-ARG WHISPER_MODEL=large-v3-turbo
+FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS builder
 
-FROM registry.fedoraproject.org/fedora@sha256:4a78eff1423dcce55cf68b8fd66e7cdca61c85978283db3ecc3089a8419fbbc0 AS builder
-
-RUN dnf -y --nodocs install \
-        git python3-pip bash cmake g++ \
-        vulkan-loader-devel vulkaninfo mesa-vulkan-drivers glslc spirv-headers-devel \
-    && dnf clean all && rm -rf /var/cache/dnf/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates git build-essential cmake curl \
+        python3 python3-pip python3-venv \
+        libvulkan-dev vulkan-tools mesa-vulkan-drivers glslc spirv-headers \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/whisper.cpp
 RUN git clone https://github.com/ggml-org/whisper.cpp.git . \
@@ -14,9 +14,6 @@ RUN git clone https://github.com/ggml-org/whisper.cpp.git . \
 RUN git clean -xdf \
     && cmake -B build -DGGML_VULKAN=1 \
     && cmake --build build -j --config Release
-
-ARG WHISPER_MODEL
-RUN models/download-ggml-model.sh ${WHISPER_MODEL}
 
 WORKDIR /tmp/libs
 RUN find /opt/whisper.cpp/build \( -name "libwhisper*" -o -name "libggml*" \) -exec cp -a {} /tmp/libs/ \; \
@@ -28,23 +25,21 @@ RUN git clone https://github.com/ser/wyoming-whisper-api-client.git . \
     && script/setup \
     && .venv/bin/pip install --no-deps .
 
-FROM registry.fedoraproject.org/fedora-minimal@sha256:1dc6bd367b14f10b205a0b49afcef8e295952a4187190f1672c3074f8117b74d AS runtime
+FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS runtime
 
-RUN microdnf -y --nodocs --setopt=install_weak_deps=0 install \
-        bash ncurses ca-certificates libstdc++ libgcc libatomic libgomp \
-        vulkan-loader vulkaninfo mesa-vulkan-drivers python3 shadow-utils \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash ca-certificates libstdc++6 libgcc-s1 libatomic1 libgomp1 \
+        vulkan-tools mesa-vulkan-drivers python3 passwd \
     && groupadd --gid 1000 whisper \
-    && useradd --uid 1000 --gid 1000 --create-home --shell /sbin/nologin whisper \
-    && microdnf clean all && rm -rf /var/cache/dnf/*
-
-ARG WHISPER_MODEL
-WORKDIR /opt/whisper.cpp/models
-COPY --from=builder /opt/whisper.cpp/models/ggml-${WHISPER_MODEL}.bin .
+    && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin whisper \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/wyoming-whisper-api-client
 COPY --from=builder /opt/wyoming-whisper-api-client/.venv .venv
 COPY --from=builder /opt/whisper.cpp/build/bin /usr/bin
-COPY --from=builder /tmp/libs/ /usr/lib64/
+COPY --from=builder /tmp/libs/ /usr/local/lib/
+RUN ldconfig
 
 COPY run.sh /opt/wyoming-whisper-vulkan-service/run.sh
 RUN chmod 0755 /opt/wyoming-whisper-vulkan-service/run.sh

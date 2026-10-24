@@ -3,22 +3,24 @@
 #   tts  = phoonnx + wyoming-ovos-tts bridge                 -> wyoming :10400 (debug HTTP :9666 localhost)
 #          (voices incl. piper-voices ports like piper/es_ES-davefx-medium if added)
 #
-# Data dirs are RELATIVE to this compose file (./phoonnx-data etc.), so run
-# compose FROM THIS FOLDER:  cd wyoming-voice-gl && docker compose up -d --build
+# Data dirs are RELATIVE to this compose file (./phoonnx-data, ./whisper-data),
+# so run compose FROM THIS FOLDER:  cd wyoming-voice-gl && ./setup.sh
 # From another cwd, pass the compose file explicitly; relative paths resolve
 # against its directory:
-#   docker compose -f /path/to/wyoming-voice-gl/compose.yml up -d --build
+#   docker compose -f /path/to/wyoming-voice-gl/compose.yml up -d
 name: wyoming-voice-gl
 
 services:
   whisper:
     build:
       context: ./stt/whisper-vulkan
-      args:
-        WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo}
     image: wyoming-whisper-vulkan
     restart: unless-stopped
     init: true
+    # The model is fetched by setup.sh, not baked into the image, so changing
+    # WHISPER_MODEL needs only a restart.
+    volumes:
+      - ./whisper-data:/models
     devices:
       - /dev/dri:/dev/dri
     group_add:
@@ -31,7 +33,7 @@ services:
       - "10300:10300"
     environment:
       - TZ=${TZ:-Europe/Madrid}
-    command: ["-l", "${WHISPER_LANG:-gl}"]
+    command: ["-l", "${WHISPER_LANG:-gl}", "-m", "${WHISPER_MODEL:-large-v3-turbo}"]
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/10300'"]
       interval: 30s
@@ -44,8 +46,8 @@ services:
     image: phoonnx-wyoming:latest
     restart: unless-stopped
     init: true
-    # Keep the tracked config in the repo and mount it read-only; the runtime
-    # cache stays in phoonnx-data.
+    # Live bind mounts: config edits need only `docker compose restart phoonnx`
+    # (no rebuild); the runtime cache stays in phoonnx-data.
     volumes:
       - ./phoonnx-data:/home/ovos/.cache
       - ./tts/phoonnx-wyoming/mycroft.conf:/home/ovos/.config/mycroft/mycroft.conf:ro
@@ -63,14 +65,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
-
-#  # CPU fallback (faster-whisper, galician finetune ~2.3s/request):
-#  whisper:
-#    image: rhasspy/wyoming-whisper
-#    volumes:
-#      - ./whisper-data:/data
-#    environment:
-#      - TZ=Europe/Madrid
-#    command: --model Jarbas/faster-whisper-small-gl-cv13 --language gl --beam-size 1 --cpu-threads 8 --compute-type int8
-#    ports:
-#      - "10300:10300"

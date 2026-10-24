@@ -34,7 +34,7 @@ jobs:
 
       - name: ShellCheck
         run: |
-          shellcheck download-voices.sh
+          shellcheck setup.sh
           shellcheck tests/run_roundtrip.sh
           shellcheck stt/whisper-vulkan/run.sh
 
